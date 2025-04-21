@@ -25,6 +25,7 @@ def createVitals(*, vitals: VitalsCreate, session: SessionDep, patient_id: UUID,
     session.commit()
     session.refresh(db_vitals)
     return db_vitals
+
 def get_patient_by_id(patient_id: UUID, session: SessionDep) -> PatientPublic:
     patient = session.exec(select(Patient).where(Patient.id == patient_id)).first()
     if not patient:

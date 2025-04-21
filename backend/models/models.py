@@ -1,3 +1,5 @@
+"""
+
 import uuid
 
 
@@ -22,9 +24,9 @@ class PatientBase(SQLModel):
 class Patient(PatientBase, table=True):
     __tablename__ = "patients"
     id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    vitals = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    lab_results = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    neurologist_consultation = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    vitals: Optional["Vitals"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    lab_results: Optional["LabResults"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    neurologist_consultation: Optional["NeurologistConsultation"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
     # Add any additional fields or relationships here if needed
     # Example: relationships with other models
@@ -52,19 +54,7 @@ class PatientsPublic(PatientBase):
     count : int
 
 
-"""
-#Defining models for vitals
-troke or serious head injury in the previous 3 months
-* Intracranial hemorrhage, tumor, or arteriovenous malformation
-* Recent myocardial infarction
-* Systolic blood pressure > 185 mmHg or diastolic blood pressure > 110 mmHg
-* Blood glucose < 50 mg/dL or >400 mg/dL
-* Use of anticoagulants with elevated INR >=3 causes bleeding
-* Platelet count < 100,000/μL
-* Recent surgery or biopsy of a parenchymal organ
 
-
-"""
 
 class VitalsBase(SQLModel):
     patient_id: UUID = Field(foreign_key="patients.id")
@@ -85,27 +75,20 @@ class VitalsBase(SQLModel):
 
 
     #Relationship with Patient model
-    patient: Optional[Patient] = Relationship(back_populates="vitals")
+    patient: Optional["Patient"] = Relationship(back_populates="vitals")
 
 class Vitals(VitalsBase, table=True):
     __tablename__ = "vitals"
     id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     owner_id: UUID = Field(foreign_key="patients.id", nullable=False, ondelete="CASCADE")
-    patient: Optional[Patient] = Relationship(back_populates="vitals")
+    patient: Optional["Patient"] = Relationship(back_populates="vitals")
 class VitalsCreate(VitalsBase):
     pass
 
 class VitalsPublic(VitalsBase):
     pass
 
-"""
-id	Integer	Primary key
-patient_id	Integer	Foreign key to Patient
-cbc	String	Result summary for Complete Blood Count (e.g., "normal")
-bmp_glucose	Float	Glucose level in mg/dL (from Basic Metabolic Panel)
-creatinine	Float	Kidney function marker (mg/dL)
-coagulation	String	Summary of coagulation test results (e.g., "normal")
-"""
+
 
 class LabResultBase(SQLModel):
    
@@ -117,26 +100,20 @@ class LabResultBase(SQLModel):
     
 
     #Relationship with Patient model
-    patient: Optional[Patient] = Relationship(back_populates="lab_results")
+    patient: Optional["Patient"] = Relationship(back_populates="lab_results")
 
 
 class LabResults(LabResultBase, table=True):
     __tablename__ = "lab_results"
     id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     owner_id: UUID = Field(foreign_key="patients.id", nullable=False, ondelete="CASCADE")
-    patient: Optional[Patient] = Relationship(back_populates="lab_results")
+    patient: Optional["Patient"] = Relationship(back_populates="lab_results")
 
 class LabResultsPublic(LabResultBase):
     pass
 
 
-"""
-patient_id	Integer	Foreign key to Patient
-neurologist_notes	String	Free-form notes and observations
-diagnosis	String	E.g., ischemic stroke, hemorrhagic stroke
-treatment_plan	String	Instructions (e.g., tPA, admit to ICU)
 
-"""
 class AllReportData(SQLModel):
     patient_id: UUID = Field(foreign_key="patients.id")
     blood_pressure_systolic: int | None = Field(default=None, index=True)
@@ -166,8 +143,141 @@ class NeurologistConsultation(NeurologistConsultationBase, table=True):
     __tablename__ = "neurologist_consultation"
     id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     owner_id: UUID = Field(foreign_key="patients.id", nullable=False, ondelete="CASCADE")
-    patient: Optional[Patient] = Relationship(back_populates="neurologist_consultation")
+    patient: Optional["Patient"] = Relationship(back_populates="neurologist_consultation")
 
 
 class NeurologistConsultationCreate(NeurologistConsultationBase):
     pass
+
+    
+
+    """
+
+import uuid
+from typing import Optional, List
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException, Depends
+from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select
+
+# ------------------ Patient Model ------------------
+class PatientBase(SQLModel):
+    name: str = Field(index=True, nullable=False)
+    age: Optional[int] = Field(default=None, index=True)
+    sex: str = Field(index=True)
+    chief_complaint: Optional[str] = Field(default=None, index=True)
+    medical_history: Optional[str] = Field(default=None, index=True)
+    nihss_score: Optional[int] = Field(default=None, index=True)
+
+class Patient(PatientBase, table=True):
+    __tablename__ = "patients"
+    id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    vitals: List["Vitals"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    lab_results: List["LabResults"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    neurologist_consultation: Optional["NeurologistConsultation"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+class PatientPublic(PatientBase):
+    id: UUID
+
+    class Config:
+        from_attributes = True
+
+class PatientCreate(PatientBase):
+    pass
+
+class PatientUpdate(SQLModel):
+    name: Optional[str] = None
+    age: Optional[int] = None
+    sex: Optional[str] = None
+
+class PatientsPublic(SQLModel):
+    patients: List[PatientPublic]
+    count: int
+
+# ------------------ Vitals Model ------------------
+class VitalsBase(SQLModel):
+    patient_id: UUID = Field(foreign_key="patients.id")
+    blood_pressure_systolic: Optional[int] = Field(default=None, index=True)
+    blodd_pressure_diastolic: Optional[int] = Field(default=None, index=True)
+    heart_rate: Optional[int] = Field(default=None, index=True)
+    respiratory_rate: Optional[int] = Field(default=None, index=True)
+    oxygen_saturation: Optional[int] = Field(default=None, index=True)
+    significant_head_trauma: Optional[bool] = Field(default=None, index=True)
+    recent_surgery: Optional[bool] = Field(default=None, index=True)
+    recent_myocardial_infarction: Optional[bool] = Field(default=None, index=True)
+    recent_hemorrhage: Optional[bool] = Field(default=None, index=True)
+    platelet_count: Optional[int] = Field(default=None, index=True)
+    cbc: Optional[str] = Field(default=None, index=True)
+    bmp_glucose: Optional[float] = Field(default=None, index=True)
+    creatinine: Optional[float] = Field(default=None, index=True)
+    coagulation: Optional[str] = Field(default=None, index=True)
+
+class Vitals(VitalsBase, table=True):
+    __tablename__ = "vitals"
+    id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: UUID = Field(foreign_key="patients.id", nullable=False)
+    patient: Optional["Patient"] = Relationship(back_populates="vitals")
+
+class VitalsCreate(VitalsBase):
+    pass
+
+class VitalsPublic(VitalsBase):
+    pass
+
+# ------------------ Lab Results Model ------------------
+class LabResultBase(SQLModel):
+    patient_id: UUID = Field(foreign_key="patients.id")
+    cbc: Optional[str] = Field(default=None, index=True)
+    bmp_glucose: Optional[float] = Field(default=None, index=True)
+    creatinine: Optional[float] = Field(default=None, index=True)
+    coagulation: Optional[str] = Field(default=None, index=True)
+
+class LabResults(LabResultBase, table=True):
+    __tablename__ = "lab_results"
+    id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: UUID = Field(foreign_key="patients.id", nullable=False)
+    patient: Optional["Patient"] = Relationship(back_populates="lab_results")
+
+class LabResultsPublic(LabResultBase):
+    pass
+
+# ------------------ All Report Data (Read-only composite) ------------------
+class AllReportData(SQLModel):
+    patient_id: UUID = Field(foreign_key="patients.id")
+    blood_pressure_systolic: Optional[int] = Field(default=None, index=True)
+    blodd_pressure_diastolic: Optional[int] = Field(default=None, index=True)
+    heart_rate: Optional[int] = Field(default=None, index=True)
+    respiratory_rate: Optional[int] = Field(default=None, index=True)
+    oxygen_saturation: Optional[int] = Field(default=None, index=True)
+    significant_head_trauma: Optional[bool] = Field(default=None, index=True)
+    recent_surgery: Optional[bool] = Field(default=None, index=True)
+    recent_myocardial_infarction: Optional[bool] = Field(default=None, index=True)
+    recent_hemorrhage: Optional[bool] = Field(default=None, index=True)
+    platelet_count: Optional[int] = Field(default=None, index=True)
+    cbc: Optional[str] = Field(default=None, index=True)
+    bmp_glucose: Optional[float] = Field(default=None, index=True)
+    creatinine: Optional[float] = Field(default=None, index=True)
+    coagulation: Optional[str] = Field(default=None, index=True)
+
+# ------------------ Neurologist Consultation Model ------------------
+class NeurologistConsultationBase(SQLModel):
+    patient_id: UUID = Field(foreign_key="patients.id")
+    neurologist_notes: Optional[str] = Field(default=None, index=True)
+    diagnosis: Optional[str] = Field(default=None, index=True)
+    treatment_plan: Optional[str] = Field(default=None, index=True)
+
+class NeurologistConsultation(NeurologistConsultationBase, table=True):
+    __tablename__ = "neurologist_consultation"
+    id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: UUID = Field(foreign_key="patients.id", nullable=False)
+    patient: Optional["Patient"] = Relationship(back_populates="neurologist_consultation")
+
+class NeurologistConsultationCreate(NeurologistConsultationBase):
+    pass
+
+# Resolve all forward references
+Patient.update_forward_refs()
+Vitals.update_forward_refs()
+LabResults.update_forward_refs()
+NeurologistConsultation.update_forward_refs()
