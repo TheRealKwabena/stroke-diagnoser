@@ -1,0 +1,4 @@
+#ignore python build files
+
+backend/__pycache__/
+backend/.idea/
