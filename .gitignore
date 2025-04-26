@@ -2,3 +2,6 @@
 
 backend/__pycache__/
 backend/.idea/
+backend/.venv/
+backend/.pytest_cache/
+backend/venv/
