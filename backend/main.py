@@ -1,56 +1,43 @@
-import uuid
-from uuid import uuid4
 from datetime import datetime, timedelta, timezone
-
+from dotenv import load_dotenv
+import os
 import jwt
-
 from models import *
-#from auth import verify_password, get_password_hash
 import uvicorn
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from jwt.exceptions import InvalidTokenError
-from pydantic import BaseModel
 from typing import Optional, List, Type
-from enum import Enum
-from uuid import UUID
 from typing import Annotated
 from passlib.context import CryptContext
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
-"""
 
-class User(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    name: str
-    password: str
-    age: Optional[int] = None
-    password_hash: Optional[str] = None
-    gender: Gender
-    role: Role
+load_dotenv()
 
-"""
-
-# to get a string like this run:
-# openssl rand -hex 32
-SECRET_KEY = "c2e11c2d96be3ce73b24060b37687761f9b4c4fd87f2c781cc22ee2621d2fe3f"
+#Secret key in .env files to encapsulate our private secrets and variables
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+#Function to compare provided passwords to the hashed password in the database
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-
+#Hashes password
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-test_password = "hashman123"
+
 
 
 #Creating the frontend web links(origins) that can access the backend
@@ -60,22 +47,19 @@ origins = [
     "http://localhost:3000",
 ]
 
-#Database setup
-sqlite_file_name = "medstroker.db"
-DATABASE_URL = f"sqlite:///{sqlite_file_name}"
 
+
+#Database setup
 connect_args = {"check_same_thread": False}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 
-#
-# Code above omitted 👆
+#Create database and tables upon startup
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
 
-# Code above omitted 👆
 
 def get_session():
     with Session(engine) as session:
@@ -112,7 +96,7 @@ def authenticate_user(session: SessionDep, username: str, password: str):
         return False
     return user
 
-
+#Generates access token during signup
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
