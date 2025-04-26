@@ -19,7 +19,7 @@ class UserBase(SQLModel):
     username: str
     age: Optional[int] = None
     gender: Gender
-    #replace with hashing function
+
 
 class UserCreate(UserBase):
     password: str
@@ -39,7 +39,7 @@ class User(SQLModel, table=True):
 """
 class User(UserBase, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    hashed_password: Optional[str] = None
+    hashed_password: str
     role: Role
 
 class UserPublic(UserBase):
