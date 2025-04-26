@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 
 from models import *
-from auth import verify_password, get_password_hash
+#from auth import verify_password, get_password_hash
 import uvicorn
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import FastAPI
@@ -16,11 +16,9 @@ from typing import Optional, List, Type
 from enum import Enum
 from uuid import UUID
 from typing import Annotated
-
+from passlib.context import CryptContext
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
-
-
 
 """
 
@@ -35,7 +33,6 @@ class User(SQLModel, table=True):
 
 """
 
-
 # to get a string like this run:
 # openssl rand -hex 32
 SECRET_KEY = "c2e11c2d96be3ce73b24060b37687761f9b4c4fd87f2c781cc22ee2621d2fe3f"
@@ -45,14 +42,23 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+test_password = "hashman123"
+
+
 #Creating the frontend web links(origins) that can access the backend
 origins = [
     "http://localhost:8080",
     "http://localhost:8000",
     "http://localhost:3000",
 ]
-
-
 
 #Database setup
 sqlite_file_name = "medstroker.db"
@@ -61,11 +67,13 @@ DATABASE_URL = f"sqlite:///{sqlite_file_name}"
 connect_args = {"check_same_thread": False}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
+
 #
 # Code above omitted 👆
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+
 
 # Code above omitted 👆
 
@@ -77,12 +85,15 @@ def get_session():
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
-
-
 def on_startup():
     create_db_and_tables()
+
+
 app = FastAPI(on_startup=[create_db_and_tables])
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"],
+                   allow_credentials=True)
+
+
 # Code below omitted 👇
 
 
@@ -102,7 +113,6 @@ def authenticate_user(session: SessionDep, username: str, password: str):
     return user
 
 
-
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
@@ -115,8 +125,8 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: SessionDep
+        token: Annotated[str, Depends(oauth2_scheme)],
+        session: SessionDep
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -139,16 +149,15 @@ async def get_current_user(
 
 
 async def get_current_active_user(
-    current_user: Annotated[User, Depends(get_current_user)],
+        current_user: Annotated[User, Depends(get_current_user)],
 ):
-
     return current_user
 
 
 @app.post("/token")
 async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    session: SessionDep
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        session: SessionDep
 ) -> Token:
     user = authenticate_user(session, form_data.username, form_data.password)
     if not user:
@@ -166,20 +175,20 @@ async def login_for_access_token(
 
 @app.get("/users/me/", response_model=User)
 async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+        current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     return current_user
 
 
 @app.get("/users/me/items/")
 async def read_own_items(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+        current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     return [{"item_id": "Foo", "owner": current_user.username}]
 
+
 @app.post("/users", response_model=UserPublic)
 def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
-
     try:
         hashed_password = get_password_hash(user.password)
         print(hashed_password)
@@ -201,14 +210,11 @@ def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
-
-
-
 @app.get("/users/", response_model=List[UserPublic])
 def read_user(
-    session: SessionDep,
-    offset: int = 0,
-    limit: Annotated[int, Query(le=100)] = 100,
+        session: SessionDep,
+        offset: int = 0,
+        limit: Annotated[int, Query(le=100)] = 100,
 ) -> List[UserPublic]:
     try:
 
@@ -221,7 +227,7 @@ def read_user(
 
 @app.get("/users/{user_id}", response_model=UserPublic)
 def read_user(user_id: str, session: SessionDep) -> UserPublic:
-    user = session.get( User, user_id)
+    user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Hero not found")
     return user
@@ -235,6 +241,7 @@ def delete_user(user_id: str, session: SessionDep):
     session.delete(user)
     session.commit()
     return {"ok": True}
+
 
 @app.delete("/users/", response_model=dict)
 def delete_all_users(session: SessionDep):
@@ -252,8 +259,7 @@ def delete_all_users(session: SessionDep):
     return {"message": f"Deleted {len(users)} users."}
 
 
-
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000,
-        reload=True,
-        log_level="debug")
+                reload=True,
+                log_level="debug")
