@@ -12,7 +12,7 @@ from typing import Annotated
 from passlib.context import CryptContext
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
-
+import random
 
 load_dotenv()
 
@@ -157,21 +157,21 @@ async def login_for_access_token(
     return Token(access_token=access_token, token_type="bearer")
 
 
-@app.get("/users/me/", response_model=User)
+@app.get("/users/me/", response_model=User, tags=["Users"])
 async def read_users_me(
         current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     return current_user
 
-
+"""
 @app.get("/users/me/items/")
 async def read_own_items(
         current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     return [{"item_id": "Foo", "owner": current_user.username}]
+"""
 
-
-@app.post("/users", response_model=UserPublic)
+@app.post("/users", response_model=UserPublic, tags=["Users"])
 def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
     try:
         hashed_password = get_password_hash(user.password)
@@ -194,7 +194,7 @@ def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
-@app.get("/users/", response_model=List[UserPublic])
+@app.get("/users/", response_model=List[UserPublic], tags=["Users"])
 def read_user(
         session: SessionDep,
         offset: int = 0,
@@ -209,7 +209,7 @@ def read_user(
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
-@app.get("/users/{user_id}", response_model=UserPublic)
+@app.get("/users/{user_id}", response_model=UserPublic,  tags=["Users"])
 def read_user(user_id: str, session: SessionDep) -> UserPublic:
     user = session.get(User, user_id)
     if not user:
@@ -217,7 +217,7 @@ def read_user(user_id: str, session: SessionDep) -> UserPublic:
     return user
 
 
-@app.delete("/users/{user_id}")
+@app.delete("/users/{user_id}", response_model=dict, tags=["Users"])
 def delete_user(user_id: str, session: SessionDep):
     user = session.get(User, user_id)
     if not user:
@@ -227,7 +227,7 @@ def delete_user(user_id: str, session: SessionDep):
     return {"ok": True}
 
 
-@app.delete("/users/", response_model=dict)
+@app.delete("/users/", response_model=dict,  tags=["Users"])
 def delete_all_users(session: SessionDep):
     statement = select(User)
     users = session.exec(statement).all()
@@ -241,6 +241,111 @@ def delete_all_users(session: SessionDep):
     session.commit()
 
     return {"message": f"Deleted {len(users)} users."}
+
+
+def verify_role(current_user: User, allowed_roles: list[str]):
+    if current_user.role not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Operation not permitted for your role.")
+
+# VITALS
+@app.post("/users/me/vitals", response_model=VitalsPublic, tags=["Vitals"])
+async def create_vitals_for_user(
+    vitals: VitalsCreate,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    verify_role(current_user, ["Patient"])
+
+    simulated_nihss = random.randint(0, 10)
+    simulated_inr = round(random.uniform(0.8, 3.0), 2)
+
+    db_vitals = Vitals(
+        **vitals.dict(),
+        user_id=current_user.id,
+        nihss_score=simulated_nihss,
+        inr_score=simulated_inr
+    )
+    session.add(db_vitals)
+    session.commit()
+    session.refresh(db_vitals)
+    return db_vitals
+
+@app.get("/users/{user_id}/vitals", response_model=VitalsPublic, tags=["Vitals"])
+async def get_vitals_for_user(
+    user_id: str,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    verify_role(current_user, ["Doctor", "Neurologist", "Patient"])
+    vitals = session.exec(select(Vitals).where(Vitals.user_id == user_id)).first()
+    if not vitals:
+        raise HTTPException(status_code=404, detail="Vitals not found.")
+    return vitals
+
+#LAB RESULTS
+# LAB RESULTS
+@app.post("/users/me/results", response_model=LabResultPublic, tags=["Results"])
+async def create_lab_result_for_user(
+
+    lab_result: LabResultCreate,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    verify_role(current_user, ["Patient"])
+
+    db_lab_result = LabResult(
+        **lab_result.dict(),
+        user_id=current_user.id
+    )
+    session.add(db_lab_result)
+    session.commit()
+    session.refresh(db_lab_result)
+    return db_lab_result
+
+@app.get("/users/{user_id}/results", response_model=LabResultPublic,  tags=["Results"])
+async def get_lab_result_for_user(
+    user_id: str,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    #verifies if user is a doctor or neurologist and allows them to perform the request
+    verify_role(current_user, ["Doctor", "Neurologist"])
+    #verify_role(current_user, ["Doctor", "Neurologist", "Patient"])
+    lab_result = session.exec(select(LabResult).where(LabResult.user_id == user_id)).first()
+    if not lab_result:
+        raise HTTPException(status_code=404, detail="Lab results not found.")
+    return lab_result
+
+
+# NEUROLOGIST CONSULTATION
+@app.post("/users/{user_id}/consultations", response_model=NeurologistConsultationPublic,  tags=["Consultations"])
+async def create_consultation_for_user(
+    user_id: str,
+    consultation: NeurologistConsultationCreate,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    verify_role(current_user, ["Neurologist"])
+
+    db_consultation = NeurologistConsultation(
+        **consultation.dict(),
+        user_id=user_id
+    )
+    session.add(db_consultation)
+    session.commit()
+    session.refresh(db_consultation)
+    return db_consultation
+
+@app.get("/users/{user_id}/consultations", response_model=List[NeurologistConsultationPublic], tags=["Consultations"])
+async def get_consultations_for_user(
+    user_id: str,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    verify_role(current_user, ["Doctor", "Neurologist"])
+
+    consultations = session.exec(select(NeurologistConsultation).where(NeurologistConsultation.user_id == user_id)).all()
+    return consultations
 
 
 if __name__ == "__main__":
