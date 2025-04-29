@@ -45,9 +45,9 @@ class User(UserBase, table=True):
     vitals: Optional["Vitals"] = Relationship(back_populates="user")
 
     lab_results: Optional["LabResult"] = Relationship(back_populates="user")
-    """
+
     consultations: List["NeurologistConsultation"] = Relationship(back_populates="user")
-    """
+
 
 
 
@@ -102,7 +102,9 @@ class VitalsCreate(VitalsBase):
     pass
 
 class VitalsPublic(VitalsBase):
-   pass
+    nihss_score: Optional[int] = Field(default=None, index=True)
+    inr_score: Optional[float] = Field(default=None, index=True)
+
 
 
 
@@ -129,7 +131,7 @@ class LabResultPublic(LabResultBase):
     pass
 
 class NeurologistConsultationBase(SQLModel):
-    neurologist_notes: Optional[str] = Field(default=None, index=True)
+    tpa_approval: Optional[bool] = Field(default=None, index=True)
     diagnosis: Optional[str] = Field(default=None, index=True)
     treatment_plan: Optional[str] = Field(default=None, index=True)
 

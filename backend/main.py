@@ -13,6 +13,7 @@ from passlib.context import CryptContext
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 import random
+from utils import is_eligible_for_tpa
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 DATABASE_URL = os.getenv("DATABASE_URL")
-
+SUCCESSFUL_ELIGIBILITY_MESSAGE = "tPA administration, and admission to the ICU"
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -67,13 +68,94 @@ def get_session():
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
+def seed_data():
+    users = [
+        User(
+            id=str(uuid4()),
+            name="John Doe",
+            username="john@example.com",
+            age=45,
+            gender="male",
+            hashed_password=get_password_hash("password123"),
+            role="Patient"
+        ),
+        User(
+            id=str(uuid4()),
+            name="Jane Smith",
+            username="jane@example.com",
+            age=38,
+            gender="female",
+            hashed_password=get_password_hash("securepass"),
+            role="Doctor"
+        ),
+        User(
+            id=str(uuid4()),
+            name="Dr. Emily Neuro",
+            username="emily@neuro.com",
+            age=50,
+            gender="female",
+            hashed_password=get_password_hash("brainydoctor"),
+            role="Neurologist"
+        ),
+    ]
 
+    with Session(engine) as session:
+        session.add_all(users)
+        session.commit()
+
+        for user in users:
+            if user.role == "Patient":
+                vitals = Vitals(
+                    id=str(uuid4()),
+                    user_id=user.id,
+                    chief_complaint="Sudden weakness",
+                    medical_history="Hypertension",
+                    blood_pressure_systolic=random.randint(120, 180),
+                    blood_pressure_diastolic=random.randint(70, 110),
+                    heart_rate=random.randint(60, 100),
+                    respiratory_rate=random.randint(12, 20),
+                    oxygen_saturation=random.randint(95, 100),
+                    significant_head_trauma=random.choice([True, False]),
+                    recent_surgery=random.choice([True, False]),
+                    recent_myocardial_infarction=random.choice([True, False]),
+                    recent_hemorrhage=random.choice([True, False]),
+                    platelet_count=random.randint(100000, 450000),
+                    nihss_score=random.randint(0, 10),
+                    inr_score=round(random.uniform(0.8, 1.5), 2)
+                )
+
+                lab_result = LabResult(
+                    id=str(uuid4()),
+                    user_id=user.id,
+                    cbc="Normal",
+                    bmp_glucose=random.uniform(70, 150),
+                    creatinine=random.uniform(0.8, 1.3),
+                    coagulation=random.choice(["normal", "abnormal"]),
+                    created_at=datetime.now(timezone.utc)
+                )
+
+                consultation = NeurologistConsultation(
+                    id=str(uuid4()),
+                    user_id=user.id,
+                    neurologist_notes="Patient shows mild left-sided weakness.",
+                    diagnosis="Ischemic stroke",
+                    treatment_plan="tPA recommended if no contraindications."
+                )
+
+                session.add(vitals)
+                session.add(lab_result)
+                session.add(consultation)
+
+        session.commit()
 
 def on_startup():
     create_db_and_tables()
+    seed_data()
 
 
-app = FastAPI(on_startup=[create_db_and_tables])
+
+
+app = FastAPI(on_startup=on_startup())
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"],
                    allow_credentials=True)
 
@@ -163,13 +245,6 @@ async def read_users_me(
 ):
     return current_user
 
-"""
-@app.get("/users/me/items/")
-async def read_own_items(
-        current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    return [{"item_id": "Foo", "owner": current_user.username}]
-"""
 
 @app.post("/users", response_model=UserPublic, tags=["Users"])
 def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
@@ -192,6 +267,7 @@ def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
     except Exception as e:
         print("Error creating user:", e)
         raise HTTPException(status_code=500, detail="Something went wrong")
+
 
 
 @app.get("/users/", response_model=List[UserPublic], tags=["Users"])
@@ -282,7 +358,7 @@ async def get_vitals_for_user(
         raise HTTPException(status_code=404, detail="Vitals not found.")
     return vitals
 
-#LAB RESULTS
+
 # LAB RESULTS
 @app.post("/users/me/results", response_model=LabResultPublic, tags=["Results"])
 async def create_lab_result_for_user(
@@ -346,6 +422,28 @@ async def get_consultations_for_user(
 
     consultations = session.exec(select(NeurologistConsultation).where(NeurologistConsultation.user_id == user_id)).all()
     return consultations
+@app.get("/users/{user_id}/tpa-eligibility", response_model=dict)
+async def check_tpa_eligibility(
+    user_id: str,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    verify_role(current_user, ["Doctor", "Neurologist"])
+
+    user = session.get(User, user_id)
+    vitals = session.exec(select(Vitals).where(Vitals.user_id == user_id)).first()
+    lab_result = session.exec(select(LabResult).where(LabResult.user_id == user_id)).first()
+
+    if not user or not vitals or not lab_result:
+        raise HTTPException(status_code=404, detail="Missing data for eligibility evaluation.")
+
+    eligible = is_eligible_for_tpa(vitals, lab_result, user)
+    message = "Do not administer tPA"
+
+    if eligible:
+        message = SUCCESSFUL_ELIGIBILITY_MESSAGE
+
+    return {"eligible_for_tpa": message}
 
 
 if __name__ == "__main__":
