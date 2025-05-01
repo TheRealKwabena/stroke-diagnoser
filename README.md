@@ -8,6 +8,12 @@ Built with:
 - **Frontend:** React, TypeScript
 - **Database:** SQLite (development)
 
+
+Links:
+
+- **Backend:** 
+- **Frontend:** 
+
 ---
 
 ## 📦 Project Structure
