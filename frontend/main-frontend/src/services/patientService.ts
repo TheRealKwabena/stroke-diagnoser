@@ -3,7 +3,7 @@ import axios from 'axios';
 import { api } from '../lib/api';
 import { PatientData, LabData, Diagnosis } from '../types/patient';
 
-const API_URL = 'http://localhost:8000'; // Update this to match your FastAPI server
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000' || "https://stroke-diagnoser.onrender.com"; / Update this to match your FastAPI server
 
 // Helper to get the auth token
 const getAuthHeader = () => {
