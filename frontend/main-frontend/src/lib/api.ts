@@ -3,7 +3,8 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // Use an environment variable or update this with your actual backend URL
 // If you're using the Lovable preview, you need to use an absolute URL that allows CORS
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000' || "https://stroke-diagnoser.onrender.com"; 
+//const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000' || "https://stroke-diagnoser.onrender.com";
+const API_URL = "https://stroke-diagnoser.onrender.com"; 
 
 // Create a configured axios instance
 const apiClient = axios.create({

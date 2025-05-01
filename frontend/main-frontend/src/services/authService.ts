@@ -17,8 +17,8 @@ interface TokenResponse {
 
 // Update this to match your FastAPI server
 // If running locally in development, this should work, otherwise adjust for your deployment
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000' || "https://stroke-diagnoser.onrender.com"; 
-
+//const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000' || "https://stroke-diagnoser.onrender.com"; 
+const API_URL = "https://stroke-diagnoser.onrender.com"; 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<TokenResponse> => {
     try {
