@@ -48,7 +48,8 @@ def clear_database():
 
 #Creating the frontend web links(origins) that can access the backend
 origins = [
-     "*"
+     "*",
+     "https://stroke-diagnoser-jrud.vercel.app/"
 ]
 
 
