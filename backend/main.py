@@ -11,7 +11,7 @@ from typing import Optional, List, Type
 from typing import Annotated
 from passlib.context import CryptContext
 from fastapi import Depends, FastAPI, HTTPException, Query, status
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel import Field, Session, SQLModel, create_engine, select, delete
 import random
 from utils import is_eligible_for_tpa
 
@@ -39,13 +39,16 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 
-
+def clear_database():
+    with Session(engine) as session:
+        users = session.exec(select(User)).all()
+        for user in users:
+            session.delete(user)
+        session.commit()
 
 #Creating the frontend web links(origins) that can access the backend
 origins = [
-    "http://localhost:8080",
-    "http://localhost:8000",
-    "http://localhost:3000",
+     "*"
 ]
 
 
@@ -150,7 +153,8 @@ def seed_data():
 
 def on_startup():
     create_db_and_tables()
-    seed_data()
+    #clear_database()
+    #seed_data()
 
 
 
@@ -312,6 +316,11 @@ def delete_all_users(session: SessionDep):
         return {"message": "No users to delete."}
 
     for user in users:
+
+        # manually delete related vitals, labs, consultations
+        session.exec(delete(Vitals).where(Vitals.user_id == user.id))
+        session.exec(delete(LabResult).where(LabResult.user_id == user.id))
+        session.exec(delete(NeurologistConsultation).where(NeurologistConsultation.user_id == user.id))
         session.delete(user)
 
     session.commit()
@@ -358,7 +367,6 @@ async def get_vitals_for_user(
         raise HTTPException(status_code=404, detail="Vitals not found.")
     return vitals
 
-
 # LAB RESULTS
 @app.post("/users/me/results", response_model=LabResultPublic, tags=["Results"])
 async def create_lab_result_for_user(
@@ -392,6 +400,17 @@ async def get_lab_result_for_user(
         raise HTTPException(status_code=404, detail="Lab results not found.")
     return lab_result
 
+@app.get("/users/role/{role}", response_model=List[UserPublic], tags=["Users"])
+def get_users_by_role(
+    role: Role,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    # Optional: restrict to certain roles
+    verify_role(current_user, ["Doctor", "Neurologist"])
+
+    users = session.exec(select(User).where(User.role == role)).all()
+    return users
 
 # NEUROLOGIST CONSULTATION
 @app.post("/users/{user_id}/consultations", response_model=NeurologistConsultationPublic,  tags=["Consultations"])
