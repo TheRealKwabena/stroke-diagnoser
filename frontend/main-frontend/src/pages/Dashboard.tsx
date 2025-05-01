@@ -1,23 +1,32 @@
 
-import { useIsMobile } from "@/hooks/use-mobile"
-import { AlertBanner } from "@/components/AlertBanner"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Users, Brain, Activity, AlertTriangle } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { useIsMobile } from "@/hooks/use-mobile";
+import { AlertBanner } from "@/components/AlertBanner";
+import { Users, Brain, Activity, AlertTriangle, FileText, Heart, Stethoscope } from 'lucide-react';
 import { StatsCard } from "@/components/StatsCard";
-
-const criticalVitals = [
-  { type: "Blood Pressure", value: 180, threshold: 140, unit: "mmHg" },
-  { type: "Heart Rate", value: 120, threshold: 100, unit: "bpm" }
-]
+import { ConsultationCard } from "@/components/ConsultationCard";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, Legend, ResponsiveContainer, LineChart, 
+  Line, PieChart, Pie, Cell 
+} from 'recharts';
 
 interface DashboardProps {
   userRole?: 'technician' | 'neurologist';
 }
 
 const Dashboard = ({ userRole = 'technician' }: DashboardProps) => {
-  const isMobile = useIsMobile()
+  const location = useLocation();
+  const isMobile = useIsMobile();
+  const patientInfo = location.state?.completeData?.patientData;
+  const labData = location.state?.completeData?.labData;
+  const diagnosis = location.state?.completeData?.diagnosis;
 
-  // Statistics data
+  const criticalVitals = [
+    { type: "Blood Pressure", value: 180, threshold: 140, unit: "mmHg" },
+    { type: "Heart Rate", value: 120, threshold: 100, unit: "bpm" }
+  ]
+
   const statsData = {
     totalPatients: 1543,
     strokeTypes: {
@@ -28,8 +37,7 @@ const Dashboard = ({ userRole = 'technician' }: DashboardProps) => {
     averageAge: 62
   }
 
-  // Sample data for charts
-  const patientData = [
+  const patientStatsData = [
     { name: 'Jan', patients: 400 },
     { name: 'Feb', patients: 300 },
     { name: 'Mar', patients: 500 },
@@ -62,9 +70,17 @@ const Dashboard = ({ userRole = 'technician' }: DashboardProps) => {
           {userRole === 'neurologist' ? 'Neurologist Dashboard' : 'Technician Dashboard'}
         </h1>
 
+        {patientInfo && (
+          <ConsultationCard
+            patientData={patientInfo}
+            labData={labData}
+            diagnosis={diagnosis}
+            className="mb-6"
+          />
+        )}
+
         <AlertBanner alerts={criticalVitals} />
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatsCard
             title="Total Patients"
@@ -92,12 +108,11 @@ const Dashboard = ({ userRole = 'technician' }: DashboardProps) => {
         </div>
         
         <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
-          {/* Patient Statistics */}
           <div className="bg-white p-6 rounded-2xl shadow-sm">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Patient Statistics</h2>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={patientData}>
+                <BarChart data={patientStatsData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
@@ -109,7 +124,6 @@ const Dashboard = ({ userRole = 'technician' }: DashboardProps) => {
             </div>
           </div>
 
-          {/* Stroke Types Distribution */}
           <div className="bg-white p-6 rounded-2xl shadow-sm">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Stroke Types Distribution</h2>
             <div className="h-80">
@@ -135,7 +149,6 @@ const Dashboard = ({ userRole = 'technician' }: DashboardProps) => {
             </div>
           </div>
 
-          {/* Role-specific charts */}
           {userRole === 'neurologist' && (
             <div className="bg-white p-6 rounded-2xl shadow-sm">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Neural Activity Patterns</h2>
@@ -179,7 +192,7 @@ const Dashboard = ({ userRole = 'technician' }: DashboardProps) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Dashboard
+export default Dashboard;
