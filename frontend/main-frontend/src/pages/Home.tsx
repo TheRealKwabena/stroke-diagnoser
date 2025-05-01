@@ -56,13 +56,13 @@ const Home = () => {
               ) : (
                 <>
                   <Button 
-                    className="bg-white border-2 border-gray-200 text-gray-800 px-6 py-3 rounded-full text-sm font-medium hover:border-gray-300"
+                    className="bg-white border-2 border-gray-200 text-gray-800 px-6 py-3 shadow-md rounded-md text-sm font- hover:text-white hover:bg-black hover:border-gray-300"
                     onClick={handleOpenAuthModal}
                   >
                     Sign In
                   </Button>
                   <Button 
-                    className="bg-purple-500 text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-purple-600 flex items-center"
+                    className="bg-blue-500 text-white px-6 py-3 rounded-md shadow-md shadow-gray-800 text-sm font-medium hover:bg-blue-600 flex items-center"
                     onClick={handleOpenAuthModal}
                   >
                     Sign Up Now
@@ -87,7 +87,7 @@ const Home = () => {
           <div className="relative">
             <div className="bg-white p-8 rounded-3xl shadow-lg">
               <img
-                src="/lovable-uploads/e84e0cf3-54b5-4bd7-b5f8-3f5585afa781.png"
+                src="/lovable-uploads/doctors.jpg"
                 alt="Medical Care"
                 className="rounded-2xl w-full"
               />
