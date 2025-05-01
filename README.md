@@ -9,10 +9,10 @@ Built with:
 - **Database:** SQLite (development)
 
 
-Links:
+Available Links:
 
-- **Backend:** 
-- **Frontend:** 
+- **Backend:** https://stroke-diagnoser.onrender.com/docs
+- **Frontend:** https://stroke-diagnoser-jrud.vercel.app/
 
 ---
 
